@@ -50,13 +50,13 @@ const getproductlist = (req, res) => {
     // select id,name,subtitle,imageHost,mainImage,price,originalPrice,stock from product ORDER BY price asc LIMIT 0,5
     let pageSize = query.pageSize
     let pageNum = query.pageNum
-    
+
     let start = 0
-    if(!(pageNum&&pageSize)){
+    if (!(pageNum && pageSize)) {
         start = 0
         pageSize = 10
-    }else{
-        start = (pageNum-1)*pageSize
+    } else {
+        start = (pageNum - 1) * pageSize
     }
     let sql = `select id,name,subtitle,imageHost,mainImage,price,originalPrice,stock from product LIMIT 0,10`
     switch (query.orderBy) {
@@ -69,7 +69,7 @@ const getproductlist = (req, res) => {
         default:
             sql = `select id,name,subtitle,imageHost,mainImage,price,originalPrice,stock from product limit ${start},${pageSize}`
     }
-    
+
     db.base(sql, null, data => {
         res.json({
             status: 0,
@@ -81,6 +81,29 @@ const getproductlist = (req, res) => {
                 list: data
             },
         })
+    })
+}
+
+
+/**
+ * 商品推荐
+ */
+const getproductRecommend = (req, res) => {
+    const sql = 'SELECT * FROM product ORDER BY RAND() LIMIT 6'
+    db.base(sql, null, data => {
+        if (data.length > 0) {
+            res.json({
+                status: 0,
+                msg: 'ok',
+                data: data
+            })
+        } else {
+            res.json({
+                status: 0,
+                msg: 'ok',
+                data: []
+            })
+        }
     })
 }
 
@@ -113,39 +136,39 @@ const getcategoryData = (req, res) => {
 /**
  * 登录
  */
-const login = (req,res) => {
+const login = (req, res) => {
     let body = req.body
     console.log(req.body)
     const sql = 'select * from users where username = ?'
-    db.base(sql,[body.username],(data)=>{
-        if(data.length > 0){
+    db.base(sql, [body.username], (data) => {
+        if (data.length > 0) {
             const sql = 'select * from users where username = ? and password = ?'
-            db.base(sql,[body.username,body.password],(result)=>{
-                if(result.length > 0){
+            db.base(sql, [body.username, body.password], (result) => {
+                if (result.length > 0) {
                     body.user_id = result[0].id;
                     let token = jwt.sign(body, secretKey, {
                         expiresIn: 60 * 60 * 24 // 授权时效24小时
                     });
                     res.json({
-                        status:0,
-                        msg:'ok',
-                        data:{
+                        status: 0,
+                        msg: 'ok',
+                        data: {
                             token
                         }
                     })
-                }else{
+                } else {
                     res.json({
-                        status:-1,
-                        msg:'密码错误',
-                        data:null
+                        status: -1,
+                        msg: '密码错误',
+                        data: null
                     })
                 }
             })
-        }else{
+        } else {
             res.json({
-                status:-1,
-                msg:'用户名错误',
-                data:null
+                status: -1,
+                msg: '用户名错误',
+                data: null
             })
         }
     })
@@ -154,21 +177,21 @@ const login = (req,res) => {
 /**
  * 注册
  */
-const register = (req,res) => {
+const register = (req, res) => {
     const body = req.body
     const sql = 'select * from users where username = ?'
-    db.base(sql,[body.username],data=>{
-        if(data.length > 0){
+    db.base(sql, [body.username], data => {
+        if (data.length > 0) {
             res.json({
-                data:null,
-                msg:'用户名已被注册',
-                status:-1
+                data: null,
+                msg: '用户名已被注册',
+                status: -1
             })
-        }else{
+        } else {
             body.createtime = new Date()
             body.status = 1
             const sql = 'insert into users set ?'
-            db.base(sql,body,result=>{
+            db.base(sql, body, result => {
                 if (result.affectedRows == 1) {
                     res.json({
                         data: null,
@@ -190,21 +213,140 @@ const register = (req,res) => {
 /**
  * 获取用户信息
  */
-const getUserInfo = (req,res) => {
+const getUserInfo = (req, res) => {
     const user_id = req.decoded.user_id
     const sql = 'select username,phone,email,avatar from users where id = ?'
-    db.base(sql,[user_id],data=>{
-        if(data.length > 0){
+    db.base(sql, [user_id], data => {
+        if (data.length > 0) {
             res.json({
-                data:data[0],
-                msg:'ok',
-                status:0
+                data: data[0],
+                msg: 'ok',
+                status: 0
             })
-        }else{
+        } else {
             res.json({
-                data:null,
-                msg:'error',
-                status:-1
+                data: null,
+                msg: 'error',
+                status: -1
+            })
+        }
+    })
+}
+
+
+/**
+ * 添加商品到购物车
+ */
+const cartAdd = (req, res) => {
+    const user_id = req.decoded.user_id
+    const body = req.body
+    // 查询是否该用户已添加过该商品
+    const sql = 'select * from cart where userId=? and productId=?'
+    db.base(sql, [user_id, body.productId], data => {
+        if (data.length > 0) {
+            // 更新数量
+            let count = data[0].count - 0 + (body.count - 0)
+            const u_sql = 'update cart set count=? where id=?'
+            db.base(u_sql, [count, data[0].id], result => {
+                if (result.affectedRows == 1) {
+                    res.json({
+                        status: 0,
+                        data: null,
+                        msg: '更新ok'
+                    })
+                } else {
+                    res.json({
+                        status: -1,
+                        data: null,
+                        msg: 'error'
+                    })
+                }
+            })
+        } else {
+            // 添加数据
+            body.createtime = new Date()
+            body.userId = user_id
+            const i_sql = 'insert into cart set ?'
+            db.base(i_sql, body, result => {
+                if (result.affectedRows == 1) {
+                    res.json({
+                        status: 0,
+                        data: null,
+                        msg: '新增ok'
+                    })
+                } else {
+                    res.json({
+                        status: -1,
+                        data: null,
+                        msg: 'error'
+                    })
+                }
+            })
+        }
+    })
+}
+
+/**
+ * 获取购物车数据
+ */
+const cartList = (req, res) => {
+    const user_id = req.decoded.user_id
+    let carts = []
+    let ids = []
+    console.log(user_id)
+    db.base(`select id,productId,count from cart where userId=${user_id} and status=1`, null, data => {
+        if (data.length > 0) {
+            carts = [...data]
+            console.log(carts)
+            ids = carts.map(v => v.productId)
+
+            db.base(`select name,subtitle,imageHost,mainImage,price,createtime from product where id in(${ids.join()})`, null, result => {
+                if (result.length > 0) {
+                    console.log(result)
+                    let list = carts.map((o, i) => { return { ...o, ...result[i] } })
+                    res.json({
+                        data: list,
+                        status: 0,
+                        msg: 'ok'
+                    })
+                } else {
+                    res.json({
+                        status: -1,
+                        msg: 'error',
+                        data: []
+                    })
+                }
+            })
+
+        } else {
+            res.json({
+                status: 0,
+                msg: 'ok',
+                data: []
+            })
+        }
+    })
+}
+
+/**
+ * 删除购物车数据
+ */
+const cartDelete = (req, res) => {
+    const user_id = req.decoded.user_id
+    const cartId = req.body.id
+
+    db.base(`update cart set status=0 where userId=${user_id} and id=${cartId}`, null, data => {
+        if (data.affectedRows > 0) {
+            res.json({
+                status: 0,
+                msg: '删除成功',
+                data: null
+            })
+        } else {
+            res.json({
+                status: -1,
+                msg: '删除失败',
+                data: null
             })
         }
     })
@@ -217,6 +359,10 @@ module.exports = {
     getproductlist,
     getproducdetail,
     getcategoryData,
-    login,register,
-    getUserInfo
+    login, register,
+    getUserInfo,
+    cartAdd,
+    cartList,
+    cartDelete,
+    getproductRecommend
 }

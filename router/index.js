@@ -59,9 +59,14 @@ router.get('/home/category', services.gethomecategory)
 router.get('/home/floorlist', services.gethomefloorlist)
 router.get('/product/list',services.getproductlist)
 router.get('/product/detail',services.getproducdetail)
+router.get('/product/recommend',services.getproductRecommend)
 router.get('/category/data',services.getcategoryData)
 router.post('/user/login',services.login)
 router.post('/user/register',services.register)
 router.get('/user/info',services.getUserInfo)
+router.post('/cart/add',services.cartAdd)
+router.get('/cart/list',services.cartList)
+router.post('/cart/del',services.cartDelete)
+
 
 module.exports = router
